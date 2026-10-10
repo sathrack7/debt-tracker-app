@@ -55,11 +55,13 @@ input,select,textarea{font-size:16px}html{-webkit-text-size-adjust:100%;-webkit-
 </style>
 </head>
 <body>
+<div id="ob" style="display:none;position:fixed;inset:0;z-index:50;background:var(--bg);overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 20px) 16px 40px"><div id="obc" style="max-width:460px;margin:0 auto"></div></div>
 <main>
 <h1>Debt Progress Tracker</h1>
 <p class="sub">Scheduled payments post automatically on their due dates. <span id="st"></span></p>
 <div class="tabs" id="tabs"><button data-tab="o">Overview</button><button data-tab="d">Debts</button><button data-tab="i">Income</button><button data-tab="e">Expenses</button><button data-tab="p">Plan</button><button data-tab="m">Backup</button></div>
 <div id="note"></div>
+<div id="rbox"></div>
 <div id="qbox"></div>
 <div class="card" id="sum"></div>
 
@@ -187,7 +189,12 @@ input,select,textarea{font-size:16px}html{-webkit-text-size-adjust:100%;-webkit-
 <div class="card"><h2>Interest, charges &amp; corrections</h2><div class="hist" id="ahist"></div></div>
 
 <div class="card">
-<h2>Backup &amp; export</h2>
+<h2>Cloud backup &amp; restore</h2>
+<div id="cloud"></div>
+</div>
+
+<div class="card">
+<h2>Local backup &amp; export</h2>
 <p class="meta" style="margin:0 0 10px">Your data is saved on this device only. Download a backup now and then, and before switching phones or computers, or export a spreadsheet-friendly CSV.</p>
 <p style="margin:0 0 10px"><button id="bj">Download backup</button> <button id="bc" class="g" style="padding:9px 14px;font-size:inherit">Export CSV</button></p>
 <label>Backup text (shown if downloads are unavailable; paste a backup here to restore)</label>
@@ -198,6 +205,7 @@ input,select,textarea{font-size:16px}html{-webkit-text-size-adjust:100%;-webkit-
 </div>
 <p class="sub">Balances = starting balance minus recorded payments. Interest added by lenders isn't included, so projections are estimates. Scheduled payments are caught up whenever you open this page, each dated on its real due date.</p>
 </main>
+<script src="config.js"></script>
 <script>
 var S={debts:[],pays:[],inc:[],exp:[],xl:[],ox:[],loans:[],adj:[],q:[],goals:[],strat:"av",extra:0},store=null,ed=null,cf=null,ex=null,ax=null,ep=null,$=function(i){return document.getElementById(i)};
 var FL={w:"weekly",b:"every 2 weeks",m:"monthly",y:"yearly"},MQ={w:52/12,b:26/12,m:1,y:1/12},WQ={w:1,b:.5,m:12/52,y:1/52};
@@ -218,7 +226,7 @@ function adv(d){var x=P(d.next);
   return iso(new Date(y,m,Math.min(d.dom||x.getDate(),dim),12))}
 function paid(d){return S.pays.filter(function(p){return p.d===d.id}).reduce(function(a,p){return a+p.amt},0)}
 var tb='o';try{tb=localStorage.getItem('dt-tab')||'o'}catch(e){}
-var TM={sum:'o',chart:'o',goals:'o',sav:'i',mon:'i',wkb:'p',mob:'p',prj:'p',stg:'p',plan:'p',add:'d',list:'d',llist:'d',hist:'d',ahist:'d',xlist:'e',olist:'e',bkp:'m'};
+var TM={sum:'o',chart:'o',goals:'o',sav:'i',mon:'i',wkb:'p',mob:'p',prj:'p',stg:'p',plan:'p',add:'d',list:'d',llist:'d',hist:'d',ahist:'d',xlist:'e',olist:'e',bkp:'m',cloud:'m'};
 function tabs(){
   var cs=document.querySelectorAll('.card');
   cs.forEach(function(c){if(c.dataset.t)return;for(var k in TM){if(c.id===k||c.querySelector('#'+k)){c.dataset.t=TM[k];break}}});
@@ -234,6 +242,119 @@ function csv(){
   S.xl.forEach(function(x){var e=S.exp.filter(function(q){return q.id===x.e})[0];r.push(['recurring expense',x.date,e?e.name:'',x.amt,e?(e.cat||''):''])});
   S.ox.forEach(function(o){r.push(['one-off expense',o.date,o.name,o.amt,o.cat||''])});
   return r.map(function(a){return a.map(q2).join(',')}).join(String.fromCharCode(10))}
+var CFG=window.APP_CONFIG||{},SESS=null,OB={mode:'new',step:1,email:'',p:null},at=null,autoOK=false,LB='',BL=[];
+CFG.supabaseUrl=(CFG.supabaseUrl||'').replace(/\/+$/,'');
+try{SESS=JSON.parse(localStorage.getItem('dt-session')||'null');LB=localStorage.getItem('dt-lb')||''}catch(e){}
+function ready(){return !!(CFG.supabaseUrl&&CFG.supabaseKey)}
+function hasData(){return !!(S.debts.length||S.loans.length||S.inc.length||S.exp.length||S.ox.length||(S.goals||[]).length||(S.pay&&S.pay.amt>0))}
+function when(i){return new Date(i).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'})}
+function setSess(j){var u=j.user||{};SESS={access_token:j.access_token,refresh_token:j.refresh_token,expires_at:j.expires_at||Math.floor(Date.now()/1000)+(j.expires_in||3600),email:u.email||(SESS&&SESS.email)||'',uid:u.id||(SESS&&SESS.uid)||''};try{localStorage.setItem('dt-session',JSON.stringify(SESS))}catch(e){}}
+async function sb(path,o){
+  o=o||{};var h={apikey:CFG.supabaseKey,'Content-Type':'application/json'};
+  if(o.auth!==false&&SESS){
+    if(SESS.expires_at-60<Date.now()/1000){setSess(await sb('/auth/v1/token?grant_type=refresh_token',{m:'POST',auth:false,body:{refresh_token:SESS.refresh_token}}))}
+    h.Authorization='Bearer '+SESS.access_token}
+  if(o.prefer)h.Prefer=o.prefer;
+  var r=await fetch(CFG.supabaseUrl+path,{method:o.m||'GET',headers:h,body:o.body?JSON.stringify(o.body):undefined}),t=await r.text(),j2=null;
+  try{j2=t?JSON.parse(t):null}catch(e){}
+  if(!r.ok)throw new Error((j2&&(j2.msg||j2.message||j2.error_description||j2.error))||('Request failed ('+r.status+')'));
+  return j2}
+async function saveProfile(){var p=S.profile||{};await sb('/rest/v1/profiles?on_conflict=user_id',{m:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:{user_id:SESS.uid,name:p.name||'',email:SESS.email,phone:p.phone||'',updated_at:new Date().toISOString()}})}
+async function listB(){BL=await sb('/rest/v1/backups?select=id,kind,label,created_at&order=created_at.desc&limit=30')}
+async function backup(kind){
+  var man=kind!=='auto',now=new Date().toISOString();
+  await sb('/rest/v1/backups?on_conflict=user_id,kind',{m:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:{user_id:SESS.uid,kind:man?'m-'+now:'auto',label:man?'Manual backup':'Automatic backup',data:JSON.stringify(S),created_at:now}});
+  LB=now;try{localStorage.setItem('dt-lb',now)}catch(e){}
+  if(man){var o=await sb('/rest/v1/backups?kind=like.m-*&select=id&order=created_at.desc&offset=10');if(o&&o.length)await sb('/rest/v1/backups?id=in.('+o.map(function(x){return x.id}).join(',')+')',{m:'DELETE'})}
+  await listB();renderCloud()}
+function autoSoon(){if(!SESS||!ready()||!autoOK||!hasData())return;clearTimeout(at);at=setTimeout(function(){backup('auto').catch(function(){})},20000)}
+function applyS(o){
+  var pf=S.profile;
+  S=Object.assign({debts:[],pays:[],inc:[],exp:[],xl:[],ox:[],loans:[],adj:[],q:[],goals:[],strat:'av',extra:0,pay:{mode:'manual',freq:'w',amt:0,next:'',dom:0}},o);
+  S.profile=S.profile||pf;
+  S.debts.forEach(function(d){if(d.amt===undefined){d.amt=d.min||0;d.freq='m';d.next=''}if(d.apr>0&&!d.iat)d.iat=today()});
+  $("strat").value=S.strat;$("extra").value=S.extra;$("pa").value=S.pay.amt||'';$("pn").value=S.pay.next||today();
+  save();tick(false);render();renderCloud()}
+async function restoreId(id){
+  try{var r=await sb('/rest/v1/backups?id=eq.'+id+'&select=data'),o=JSON.parse(r[0].data);
+    try{localStorage.setItem('dt-prerestore',JSON.stringify(S))}catch(e){}
+    applyS(o);autoOK=true;$("rbox").innerHTML='<div class="note">Backup restored.</div>';setTimeout(function(){$("rbox").innerHTML=''},5000)}
+  catch(e){$("rbox").innerHTML='<div class="note warn">Could not restore: '+esc(e.message)+'</div>'}}
+async function chk(fresh){
+  var rb=$("rbox");
+  try{await listB()}catch(e){BL=[]}
+  if(fresh&&BL.length){
+    autoOK=false;
+    rb.innerHTML='<div class="note"><b>We found your backup</b> from '+when(BL[0].created_at)+'.'+(hasData()?' This device already has data, and restoring will replace it.':'')+'<p style="margin:8px 0 0"><button data-rs="'+BL[0].id+'">Restore it</button> <button class="g" data-rk="1">Keep this device&#39;s data</button></p></div>'}
+  else{autoOK=true;rb.innerHTML=''}
+  renderCloud()}
+function renderCloud(){
+  var c=$("cloud");if(!c)return;var p=S.profile||{};
+  if(!ready()){c.innerHTML='<p class="meta" style="margin:0">Cloud backup is not switched on in this copy of the app yet. The app owner needs to add the backup service details in config.js (see SETUP.md).</p>';return}
+  if(!SESS){c.innerHTML='<p style="margin:0 0 10px">Back up your data to your email so you can restore it if this device is ever wiped, and open it on another device.</p><button data-ob="open">Sign in with email</button>';return}
+  var h='<div class="row"><div class="f"><label>Name</label><input id="cn" value="'+esc(p.name||'')+'"></div><div class="f"><label>Phone</label><input id="cp" inputmode="tel" value="'+esc(p.phone||'')+'"></div></div>'+
+    '<p class="meta" style="margin:8px 0">Signed in as <b>'+esc(SESS.email||'')+'</b> <button class="g" data-cl="saveprof">Save details</button></p>'+
+    '<p style="margin:10px 0"><button data-cl="now">Back up now</button> <button class="g" data-cl="list">Refresh list</button> <button class="g" data-cl="out">Sign out</button></p>'+
+    '<p class="meta" id="cmsg" style="margin:0 0 8px">'+(LB?'Last backup: '+when(LB)+'. ':'No backup made from this device yet. ')+'Backups also run automatically after changes.</p>';
+  h+=BL.length?BL.map(function(b){var w=cf==='rs'+b.id;return '<div class="hr"><span>'+when(b.created_at)+' <span class="meta">('+esc(b.label||b.kind)+')</span></span><button class="g'+(w?' warn':'')+'" data-rs="'+b.id+'">'+(w?"Tap again to replace this device's data":'Restore')+'</button></div>'}).join(''):'<div class="empty">No backups found for this email yet.</div>';
+  h+='<p style="margin:12px 0 0"><button class="g'+(cf==='cdel'?' warn':'')+'" data-cl="del">'+(cf==='cdel'?'Tap again to delete everything':'Delete my cloud data')+'</button></p>';
+  c.innerHTML=h}
+function showOb(msg){
+  var n=OB.mode==='new',h='',pv=OB.p||{};
+  $("ob").style.display='block';
+  if(OB.step===1){
+    h='<h1>'+(n?'Welcome':'Sign in')+'</h1><p class="sub">'+(n?'Tell us who you are. Your data is backed up to your email, so you can restore it if this device is ever wiped.':'Enter the email you used before and we will send you a one-time code.')+'</p><div class="card">';
+    if(n)h+='<label>Full name</label><input id="on" autocomplete="name" value="'+esc(pv.name||'')+'"><div style="height:10px"></div>';
+    h+='<label>Email</label><input id="oe" type="email" autocomplete="email" inputmode="email" value="'+esc(OB.email||'')+'">';
+    if(n)h+='<div style="height:10px"></div><label>Phone number</label><input id="op" type="tel" autocomplete="tel" inputmode="tel" value="'+esc(pv.phone||'')+'"><p style="margin:12px 0 0"><label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink)"><input id="ocn" type="checkbox" style="width:auto;margin-top:3px"> I agree that my name, email, phone number and backup data are stored with the app owner so I can restore my data.</label></p>';
+    h+='<p style="margin:14px 0 0"><button data-ob="go">Continue</button></p><p class="warn" id="obm" style="margin:10px 0 0;font-size:13px">'+esc(msg||'')+'</p></div><p class="meta" style="text-align:center"><button class="g" data-ob="mode">'+(n?'I already have an account':'I am new here')+'</button>'+(CFG.requireSignIn?'':' <button class="g" data-ob="skip">Skip for now</button>')+'</p>';
+  }else{
+    h='<h1>Check your email</h1><p class="sub">We sent a code to <b>'+esc(OB.email)+'</b>. Enter it below.</p><div class="card"><label>Code</label><input id="oc6" inputmode="numeric" autocomplete="one-time-code" maxlength="8" style="font-size:22px;letter-spacing:6px"><p style="margin:14px 0 0"><button data-ob="ver">Verify</button> <button class="g" data-ob="resend">Resend code</button> <button class="g" data-ob="back">Back</button></p><p class="warn" id="obm" style="margin:10px 0 0;font-size:13px">'+esc(msg||'')+'</p></div>';
+  }
+  $("obc").innerHTML=h}
+async function obAct(a){
+  var m=function(t){var e=$("obm");if(e)e.textContent=t||''},rx=/^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  try{
+    if(a==='open'){OB={mode:'new',step:1,email:'',p:null};showOb()}
+    else if(a==='mode'){OB.mode=OB.mode==='new'?'ret':'new';OB.step=1;showOb()}
+    else if(a==='skip'){S.profile=S.profile||{skipped:1};save();$("ob").style.display='none';renderCloud()}
+    else if(a==='back'){OB.step=1;showOb()}
+    else if(a==='go'||a==='resend'){
+      var em=a==='go'?$("oe").value.trim().toLowerCase():OB.email;
+      if(!rx.test(em))return m('Please enter a valid email address.');
+      if(a==='go'&&OB.mode==='new'){
+        var nm=$("on").value.trim(),ph=$("op").value.trim();
+        if(!nm)return m('Please enter your name.');
+        if(ph.replace(/\D/g,'').length<7)return m('Please enter a valid phone number.');
+        if(!$("ocn").checked)return m('Please tick the box to agree to continue.');
+        OB.p={name:nm,email:em,phone:ph}}
+      OB.email=em;
+      if(!ready()){S.profile=OB.p||{name:'',email:em,phone:''};save();$("ob").style.display='none';renderCloud();return}
+      m('Sending code...');
+      await sb('/auth/v1/otp',{m:'POST',auth:false,body:{email:em,create_user:OB.mode==='new'}});
+      OB.step=2;showOb('')}
+    else if(a==='ver'){
+      var code=$("oc6").value.replace(/\s/g,'');
+      if(code.length<6)return m('Enter the code from your email.');
+      m('Checking...');
+      setSess(await sb('/auth/v1/verify',{m:'POST',auth:false,body:{type:'email',email:OB.email,token:code}}));
+      if(OB.p)S.profile=OB.p;
+      else{try{var pr=await sb('/rest/v1/profiles?select=name,email,phone');if(pr&&pr[0])S.profile=pr[0]}catch(e){}if(!S.profile||S.profile.skipped)S.profile={name:'',email:OB.email,phone:''}}
+      save();try{await saveProfile()}catch(e){}
+      $("ob").style.display='none';await chk(true)}
+  }catch(e){var t=String(e.message||e);m(/signups not allowed|not found/i.test(t)?'No account found for that email. Tap "I am new here" to create one.':/rate limit|too many/i.test(t)?'Too many attempts. Please wait a few minutes and try again.':/invalid|expired/i.test(t)?'That code is wrong or has expired. Check it or tap Resend code.':t)}}
+async function clAct(a){
+  var m=function(t){var e=$("cmsg");if(e)e.textContent=t};
+  try{
+    if(a==='saveprof'){S.profile=S.profile||{};S.profile.name=$("cn").value.trim();S.profile.phone=$("cp").value.trim();save();await saveProfile();m('Details saved.')}
+    else if(a==='now'){m('Backing up...');await backup('manual');m('Backed up '+when(LB)+'.')}
+    else if(a==='list'){await listB();renderCloud()}
+    else if(a==='out'){SESS=null;autoOK=false;BL=[];try{localStorage.removeItem('dt-session')}catch(e){}renderCloud()}
+    else if(a==='del'){
+      if(cf!=='cdel'){cf='cdel';renderCloud();return}
+      cf=null;await sb('/rest/v1/backups?user_id=eq.'+SESS.uid,{m:'DELETE'});await sb('/rest/v1/profiles?user_id=eq.'+SESS.uid,{m:'DELETE'});
+      BL=[];LB='';try{localStorage.removeItem('dt-lb')}catch(e){}renderCloud();m('Your cloud data was deleted.')}
+  }catch(e){m(e.message)}}
 function adjs(d){return S.adj.reduce(function(a,x){return a+(x.d===d.id?x.amt:0)},0)}
 function owed(d){return d.start+S.adj.reduce(function(a,x){return a+(x.d===d.id&&x.amt>0?x.amt:0)},0)}
 function balAt(d,D){var b=d.start;S.adj.forEach(function(a){if(a.d===d.id&&a.date<=D)b+=a.amt});S.pays.forEach(function(p){if(p.d===d.id&&p.date<=D)b-=p.amt});return b}
@@ -267,12 +388,15 @@ async function init(){
   S.debts.forEach(function(d){if(d.amt===undefined){d.amt=d.min||0;d.freq="m";d.next=""}});
   $("st").textContent=store?"Saved privately to your account.":"Saved on this device only. Use Backup to move it to another device.";
   $("strat").value=S.strat;$("extra").value=S.extra;$("id").value=today();$("nx").value=today();$("xd").value=today();$("od").value=today();$("xc").innerHTML=copts("Housing");$("oc").innerHTML=copts("Food");$("pm").value=S.pay.mode;$("pf").value=S.pay.freq;$("pa").value=S.pay.amt||'';$("pn").value=S.pay.next||today();
-  tick(true);render();tabs();
+  tick(true);render();tabs();renderCloud();
+  if(SESS&&ready()){autoOK=hasData();chk(!hasData())}
+  if(!S.profile)showOb();
 }
 var t=null;
 function save(){
   var j=JSON.stringify(S);
   try{localStorage.setItem("debt-tracker",j)}catch(e){}
+  autoSoon();
   clearTimeout(t);
   t=setTimeout(function(){if(store)store.set({json:j}).catch(function(){})},400);
 }
@@ -557,6 +681,10 @@ document.addEventListener("click",function(e){
   else if(id=g("data-xed")){ex=ex===id?null:id;render()}
   else if(id=g("data-xsave")){var q=S.exp.filter(function(z){return z.id===id})[0],a=parseFloat($("exa").value),nm=$("exn").value.trim(),nd=$("exd").value;
     if(q&&nm&&a>0&&nd){q.name=nm;q.amt=a;q.freq=$("exf").value;q.next=nd;q.dom=P(nd).getDate();q.cat=$("exc").value;ex=null;tick(false);save();render()}}
+  else if(id=g("data-ob")){obAct(id)}
+  else if(id=g("data-cl")){clAct(id)}
+  else if(id=g("data-rs")){var el=e.target;if(hasData()&&cf!=="rs"+id){cf="rs"+id;el.textContent="Tap again to replace this device's data";el.classList.add("warn")}else{cf=null;restoreId(id)}}
+  else if(id=g("data-rk")){autoOK=true;$("rbox").innerHTML="";if(hasData())backup("auto").catch(function(){})}
   else if(id=g("data-tab")){tb=id;try{localStorage.setItem('dt-tab',tb)}catch(e){}tabs();window.scrollTo(0,0)}
   else if(id=g("data-gdel")){if(cf==="g"+id){cf=null;S.goals=S.goals.filter(function(x){return x.id!==id});save();render()}else{cf="g"+id;render()}}
   else if(id=g("data-ax")){ax=ax===id?null:id;render()}

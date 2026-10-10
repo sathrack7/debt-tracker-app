@@ -1,6 +1,6 @@
-# Debt Progress Tracker (installable app)
+# Debt Progress Tracker v2 (installable app)
 
-A private debt, income and savings tracker. It runs entirely on your own device: nothing is sent to a server, and every person who installs it has their own separate data.
+A private debt, income and savings tracker. Data lives on each person's own device. In v2, people can also sign in with their email and back their data up to it, so it can be restored if the device is wiped. That needs the one-time backend setup in **SETUP.md**; without it the app still works fully on-device.
 
 ## 1. Put it online (one time, free)
 The app has to be served over HTTPS so phones and Macs can install it. Any static host works. Upload the contents of this folder as-is:
