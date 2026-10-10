@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Debt Tracker</title>
+<meta name="theme-color" content="#1f7a5a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Debt Tracker">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root{--bg:#f6f7f4;--card:#fff;--ink:#1d2421;--mut:#667069;--line:#e2e6e0;--acc:#1f7a5a;--acc2:#d9efe6;--warn:#b4472f;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141816;--card:#1c211f;--ink:#e8ede9;--mut:#9aa59e;--line:#2c3330;--acc:#4cc79a;--acc2:#23382f;--warn:#e98a73}}
+:root[data-theme="dark"]{--bg:#141816;--card:#1c211f;--ink:#e8ede9;--mut:#9aa59e;--line:#2c3330;--acc:#4cc79a;--acc2:#23382f;--warn:#e98a73}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:0 0 12px}
+.sub{color:var(--mut);margin:0 0 18px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.big{font-size:34px;font-weight:700;letter-spacing:-.5px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.stat{flex:1;min-width:110px}.stat b{display:block;font-size:17px}.stat span{color:var(--mut);font-size:12px}
+.bar{height:10px;background:var(--acc2);border-radius:99px;overflow:hidden;margin:10px 0}
+.bar i{display:block;height:100%;background:var(--acc);border-radius:99px;transition:width .4s}
+input,select,button{font:inherit;color:inherit}
+input,select{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%}
+label{font-size:12px;color:var(--mut);display:block;margin-bottom:3px}
+.f{flex:1;min-width:120px}
+button{background:var(--acc);color:#fff;border:0;border-radius:9px;padding:9px 14px;cursor:pointer;font-weight:600}
+button.g{background:transparent;color:var(--mut);border:1px solid var(--line);font-weight:500;padding:5px 9px;font-size:12px}
+.debt{border-top:1px solid var(--line);padding:14px 0}.debt:first-of-type{border-top:0;padding-top:0}
+.dh{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.meta{color:var(--mut);font-size:12px}
+.pay{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}.pay input{max-width:140px}
+.hist{max-height:300px;overflow-y:auto}
+.hr{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:13px;align-items:center}
+.hr:first-child{border-top:0}
+.plan{background:var(--acc2);border-radius:10px;padding:12px;margin-top:12px}
+.note{background:var(--acc2);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:13px}
+.warn{color:var(--warn)}.pos{color:var(--acc)}
+.empty{color:var(--mut);text-align:center;padding:14px 0}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px;min-width:460px}
+th{color:var(--mut);font-weight:500;text-align:right;padding:6px 4px;font-size:12px}td{text-align:right;padding:7px 4px;border-top:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+.mini{display:inline-block;height:6px;border-radius:9px;background:var(--acc);vertical-align:middle;margin-right:6px}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin:0 0 14px;padding-bottom:2px}.tabs button{background:var(--card);color:var(--ink);border:1px solid var(--line);font-weight:500;white-space:nowrap;padding:8px 12px}.tabs button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+input,select,textarea{font-size:16px}html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}button{touch-action:manipulation}
+</style>
+</head>
+<body>
+<main>
+<h1>Debt Progress Tracker</h1>
+<p class="sub">Scheduled payments post automatically on their due dates. <span id="st"></span></p>
+<div class="tabs" id="tabs"><button data-tab="o">Overview</button><button data-tab="d">Debts</button><button data-tab="i">Income</button><button data-tab="e">Expenses</button><button data-tab="p">Plan</button><button data-tab="m">Backup</button></div>
+<div id="note"></div>
+<div id="qbox"></div>
+<div class="card" id="sum"></div>
+
+<div class="card"><h2>Debt over time</h2><div id="chart"></div></div>
+
+<div class="card">
+<h2>Goals</h2>
+<div class="row">
+<div class="f"><label>Goal type</label><select id="gt"><option value="save">Save money</option><option value="debt">Be debt-free</option></select></div>
+<div class="f"><label>Name (optional)</label><input id="gn" placeholder="e.g. Emergency fund"></div>
+<div class="f" id="gs1"><label>Target amount</label><input id="ga" type="number" min="0" step="0.01" inputmode="decimal"></div>
+<div class="f" id="gs2"><label>Already saved</label><input id="gh" type="number" min="0" step="0.01" inputmode="decimal"></div>
+<div class="f"><label>Target date</label><input id="gd" type="date"></div>
+</div>
+<p style="margin:12px 0"><button id="addg">Add goal</button></p>
+<div id="goals"></div>
+</div>
+
+<div class="card">
+<h2>Salary &amp; savings</h2>
+<div class="row" style="margin-bottom:12px">
+<div class="f"><label>How do you want to track pay?</label><select id="pm"><option value="manual">Log each paycheck myself</option><option value="fixed">Fixed pay (recorded automatically)</option></select></div>
+<div class="f"><label>Pay period</label><select id="pf"><option value="w">Weekly</option><option value="b">Every 2 weeks</option><option value="m">Monthly</option></select></div>
+</div>
+<p id="pinfo" class="meta" style="margin:0 0 12px"></p>
+<div id="fixedbox" class="row" style="margin-bottom:12px">
+<div class="f"><label>Pay amount</label><input id="pa" type="number" min="0" step="0.01" inputmode="decimal"></div>
+<div class="f"><label>Next pay date</label><input id="pn" type="date"></div>
+<div class="f" style="align-self:flex-end"><button id="psave">Save fixed pay</button></div>
+</div>
+<div id="manualbox">
+<div class="row">
+<div class="f"><label>Pay date</label><input id="id" type="date"></div>
+<div class="f"><label>Pay amount</label><input id="ia" type="number" min="0" step="0.01" inputmode="decimal"></div>
+<div class="f"><label>Other spending (optional)</label><input id="is" type="number" min="0" step="0.01" inputmode="decimal"></div>
+</div>
+<p style="margin:12px 0"><button id="addinc">Log pay</button></p>
+</div>
+<div id="sav"></div>
+</div>
+
+<div class="card">
+<h2>Monthly summary</h2>
+<div id="mon"></div>
+</div>
+
+<div class="card"><h2>Weekly breakdown</h2><div id="wkb"></div></div>
+
+<div class="card"><h2>Monthly breakdown</h2><div id="mob"></div></div>
+
+<div class="card"><h2>Projection</h2><div id="prj"></div></div>
+
+<div class="card"><h2>Strategy: what to pay first</h2><div id="stg"></div>
+</div>
+
+<div class="card">
+<h2>Add a debt</h2>
+<div class="row">
+<div class="f" style="flex:2"><label>Name</label><input id="n" placeholder="e.g. Visa card"></div>
+<div class="f"><label>Starting balance</label><input id="s" type="number" min="0" step="0.01" inputmode="decimal"></div>
+<div class="f"><label>Current balance</label><input id="c" type="number" min="0" step="0.01" inputmode="decimal" placeholder="same as start"></div>
+<div class="f"><label>APR %</label><input id="a" type="number" min="0" step="0.01" inputmode="decimal"></div>
+<div class="f"><label>Payment amount</label><input id="m" type="number" min="0" step="0.01" inputmode="decimal"></div>
+<div class="f"><label>How often</label><select id="fq"><option value="w">Weekly</option><option value="b">Every 2 weeks</option><option value="m">Monthly</option></select></div>
+<div class="f"><label>Next payment date</label><input id="nx" type="date"></div>
+</div>
+<p class="meta">A payment is recorded automatically on each due date. If the next payment date is today or earlier, it is recorded right away.</p>
+<p style="margin:8px 0 0"><button id="add">Add debt</button></p>
+</div>
+
+<div class="card"><h2>Your debts</h2><div id="list"></div></div>
+
+<div class="card">
+<h2>Money I owe people</h2>
+<p class="meta" style="margin:0 0 10px">No interest and no fixed schedule. Pay whenever you can; it all counts toward your total debt.</p>
+<div class="row">
+<div class="f" style="flex:2"><label>Who</label><input id="ln" placeholder="e.g. Mum, Alex"></div>
+<div class="f"><label>Amount owed</label><input id="ls" type="number" min="0" step="0.01" inputmode="decimal"></div>
+<div class="f"><label>Still owe (optional)</label><input id="lc" type="number" min="0" step="0.01" inputmode="decimal" placeholder="same as amount"></div>
+<div class="f" style="flex:2"><label>Note (optional)</label><input id="lt" placeholder="e.g. rent loan"></div>
+</div>
+<p style="margin:12px 0"><button id="addl">Add</button></p>
+<div id="llist"></div>
+</div>
+
+<div class="card">
+<h2>Recurring expenses</h2>
+<div class="row">
+<div class="f" style="flex:2"><label>Expense</label><input id="xt" placeholder="e.g. Rent, phone, Netflix"></div>
+<div class="f"><label>Amount</label><input id="xa" type="number" min="0" step="0.01" inputmode="decimal"></div>
+<div class="f"><label>How often</label><select id="xf"><option value="w">Weekly</option><option value="b">Every 2 weeks</option><option value="m" selected>Monthly</option><option value="y">Yearly</option></select></div>
+<div class="f"><label>Next due date</label><input id="xd" type="date"></div>
+<div class="f"><label>Category</label><select id="xc"></select></div>
+</div>
+<p class="meta">Each expense is deducted from that week's savings on its due date. A due date of today or earlier is deducted right away.</p>
+<p style="margin:8px 0 12px"><button id="addx">Add expense</button></p>
+<div id="xlist"></div>
+</div>
+
+<div class="card">
+<h2>One-off expenses</h2>
+<div class="row">
+<div class="f" style="flex:2"><label>What for</label><input id="ot" placeholder="e.g. Groceries, car repair"></div>
+<div class="f"><label>Amount</label><input id="oa" type="number" min="0" step="0.01" inputmode="decimal"></div>
+<div class="f"><label>Date</label><input id="od" type="date"></div>
+<div class="f"><label>Category</label><select id="oc"></select></div>
+</div>
+<p style="margin:12px 0"><button id="addo">Add expense</button></p>
+<div id="olist"></div>
+<h2 style="margin:18px 0 8px">Spending by category (last 30 days)</h2>
+<div id="cats"></div>
+</div>
+
+<div class="card">
+<h2>Payoff plan</h2>
+<div class="row">
+<div class="f"><label>Strategy</label><select id="strat"><option value="av">Avalanche (highest APR first)</option><option value="sn">Snowball (smallest balance first)</option></select></div>
+<div class="f"><label>Extra per month</label><input id="extra" type="number" min="0" step="1" value="0" inputmode="decimal"></div>
+</div>
+<div id="plan"></div>
+</div>
+
+<div class="card"><h2>Payment history</h2><div class="hist" id="hist"></div></div>
+
+<div class="card"><h2>Interest, charges &amp; corrections</h2><div class="hist" id="ahist"></div></div>
+
+<div class="card">
+<h2>Backup &amp; export</h2>
+<p class="meta" style="margin:0 0 10px">Your data is saved on this device only. Download a backup now and then, and before switching phones or computers, or export a spreadsheet-friendly CSV.</p>
+<p style="margin:0 0 10px"><button id="bj">Download backup</button> <button id="bc" class="g" style="padding:9px 14px;font-size:inherit">Export CSV</button></p>
+<label>Backup text (shown if downloads are unavailable; paste a backup here to restore)</label>
+<textarea id="bt" rows="4" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px;font:12px monospace;color:inherit"></textarea>
+<p style="margin:10px 0 0"><input id="bf" type="file" accept=".json,application/json" style="width:auto"> <button id="br" class="g" style="padding:9px 14px;font-size:inherit">Restore from backup</button></p>
+<p class="meta" id="bmsg" style="margin:8px 0 0"></p>
+<div id="bkp"></div>
+</div>
+<p class="sub">Balances = starting balance minus recorded payments. Interest added by lenders isn't included, so projections are estimates. Scheduled payments are caught up whenever you open this page, each dated on its real due date.</p>
+</main>
+<script>
+var S={debts:[],pays:[],inc:[],exp:[],xl:[],ox:[],loans:[],adj:[],q:[],goals:[],strat:"av",extra:0},store=null,ed=null,cf=null,ex=null,ax=null,ep=null,$=function(i){return document.getElementById(i)};
+var FL={w:"weekly",b:"every 2 weeks",m:"monthly",y:"yearly"},MQ={w:52/12,b:26/12,m:1,y:1/12},WQ={w:1,b:.5,m:12/52,y:1/52};
+var CATS=["Housing","Utilities","Subscriptions","Food","Transport","Insurance","Health","Other"];
+function copts(sel){return CATS.map(function(c){return '<option'+(c===sel?' selected':'')+'>'+c+'</option>'}).join('')}
+var fmt=function(v){return new Intl.NumberFormat(undefined,{style:"currency",currency:"USD"}).format(v||0)};
+var esc=function(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
+var uid=function(){return Math.random().toString(36).slice(2,9)};
+function iso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function P(s){return new Date(s+"T12:00:00")}
+function today(){return iso(new Date())}
+function fd(s){return P(s).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}
+function wk(s){var d=P(s);d.setDate(d.getDate()-((d.getDay()+6)%7));return iso(d)}
+function adv(d){var x=P(d.next);
+  if(d.freq==="w"){x.setDate(x.getDate()+7);return iso(x)}
+  if(d.freq==="b"){x.setDate(x.getDate()+14);return iso(x)}
+  var y=x.getFullYear(),m=x.getMonth()+(d.freq==="y"?12:1),dim=new Date(y,m+1,0).getDate();
+  return iso(new Date(y,m,Math.min(d.dom||x.getDate(),dim),12))}
+function paid(d){return S.pays.filter(function(p){return p.d===d.id}).reduce(function(a,p){return a+p.amt},0)}
+var tb='o';try{tb=localStorage.getItem('dt-tab')||'o'}catch(e){}
+var TM={sum:'o',chart:'o',goals:'o',sav:'i',mon:'i',wkb:'p',mob:'p',prj:'p',stg:'p',plan:'p',add:'d',list:'d',llist:'d',hist:'d',ahist:'d',xlist:'e',olist:'e',bkp:'m'};
+function tabs(){
+  var cs=document.querySelectorAll('.card');
+  cs.forEach(function(c){if(c.dataset.t)return;for(var k in TM){if(c.id===k||c.querySelector('#'+k)){c.dataset.t=TM[k];break}}});
+  cs.forEach(function(c){if(c.dataset.t)c.style.display=c.dataset.t===tb?'':'none'});
+  document.querySelectorAll('#tabs button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-tab')===tb)})}
+async function dl(n,t){try{if(window.claude&&claude.use){var d=await claude.use('downloads');if(d){await d.save({filename:n,data:t});return 'Saved '+n+'.'}}else{var b=new Blob([t],{type:n.slice(-4)==='.csv'?'text/csv':'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=n;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},4000);return 'Downloaded '+n+'.'}}catch(e){if(e&&e.code==='declined')return 'Download cancelled.'}return ''}
+function q2(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'}
+function csv(){
+  var r=[['type','date','item','amount','note']],nm=function(id){var d=S.debts.concat(S.loans).filter(function(x){return x.id===id})[0];return d?d.name:''};
+  S.pays.forEach(function(p){r.push(['payment',p.date,nm(p.d),p.amt,p.note||''])});
+  S.adj.forEach(function(a){r.push([a.type,a.date,nm(a.d),a.amt,''])});
+  S.inc.forEach(function(i){r.push(['income',i.date,'pay ('+FL[i.f||'w']+')',i.amt,i.sp?'other spending '+i.sp:''])});
+  S.xl.forEach(function(x){var e=S.exp.filter(function(q){return q.id===x.e})[0];r.push(['recurring expense',x.date,e?e.name:'',x.amt,e?(e.cat||''):''])});
+  S.ox.forEach(function(o){r.push(['one-off expense',o.date,o.name,o.amt,o.cat||''])});
+  return r.map(function(a){return a.map(q2).join(',')}).join(String.fromCharCode(10))}
+function adjs(d){return S.adj.reduce(function(a,x){return a+(x.d===d.id?x.amt:0)},0)}
+function owed(d){return d.start+S.adj.reduce(function(a,x){return a+(x.d===d.id&&x.amt>0?x.amt:0)},0)}
+function balAt(d,D){var b=d.start;S.adj.forEach(function(a){if(a.d===d.id&&a.date<=D)b+=a.amt});S.pays.forEach(function(p){if(p.d===d.id&&p.date<=D)b-=p.amt});return b}
+function accr(d,upTo,post){
+  if(!(d.apr>0)||!d.iat)return 0;
+  var x=P(d.iat),acc=0;
+  for(var g=0;g<800;g++){
+    x.setDate(x.getDate()+1);var D=iso(x);if(D>upTo)break;
+    var b=balAt(d,D);if(b>0)acc+=b*d.apr/36500;
+    var nd=new Date(x);nd.setDate(nd.getDate()+1);
+    if(post&&nd.getMonth()!==x.getMonth()){if(acc>0.004)S.adj.push({id:uid(),d:d.id,amt:Math.round(acc*100)/100,date:D,type:'interest'});d.iat=D;acc=0}
+  }
+  return acc}
+function axp(d){return ax===d.id?'<div class="row" style="margin-top:8px"><div class="f"><label>What changed</label><select id="at"><option value="set">Set balance to match a statement</option><option value="add">Add a charge or fee</option><option value="sub">Reduce (credit or refund)</option></select></div><div class="f"><label>Amount</label><input id="aa" type="number" min="0" step="0.01" inputmode="decimal"></div><div class="f" style="align-self:flex-end"><button data-as="'+d.id+'">Apply</button></div></div>':''}
+function lastp(d){var m="";S.pays.forEach(function(p){if(p.d===d.id&&p.note!=="paid before tracking"&&p.date>m)m=p.date});return m}
+function bal(d){return Math.max(0,d.start+adjs(d)-paid(d))}
+function mEq(d){return d.amt>0?d.amt*MQ[d.freq||"m"]:(d.min||0)}
+
+async function init(){
+  var raw=null;
+  try{var l=localStorage.getItem("debt-tracker");if(l)raw=l}catch(e){}
+  try{
+    if(window.claude&&claude.use){
+      var db=await claude.use("db"),u=await claude.use("user");
+      if(db&&u){var id=await u.id();if(id){store=db.collection("data/users/"+id).doc("tracker");
+        var snap=await store.get();if(snap.exists&&snap.data().json)raw=snap.data().json;}}
+    }
+  }catch(e){store=null}
+  if(raw){try{var o=JSON.parse(raw);if(o&&o.debts)S=Object.assign(S,o)}catch(e){}}
+  S.inc=S.inc||[];S.exp=S.exp||[];S.xl=S.xl||[];S.ox=S.ox||[];S.loans=S.loans||[];S.pay=S.pay||{mode:'manual',freq:'w',amt:0,next:'',dom:0};S.adj=S.adj||[];S.q=S.q||[];S.goals=S.goals||[];S.debts.forEach(function(d){if(d.apr>0&&!d.iat)d.iat=today()});
+  S.debts.forEach(function(d){if(d.amt===undefined){d.amt=d.min||0;d.freq="m";d.next=""}});
+  $("st").textContent=store?"Saved privately to your account.":"Saved on this device only. Use Backup to move it to another device.";
+  $("strat").value=S.strat;$("extra").value=S.extra;$("id").value=today();$("nx").value=today();$("xd").value=today();$("od").value=today();$("xc").innerHTML=copts("Housing");$("oc").innerHTML=copts("Food");$("pm").value=S.pay.mode;$("pf").value=S.pay.freq;$("pa").value=S.pay.amt||'';$("pn").value=S.pay.next||today();
+  tick(true);render();tabs();
+}
+var t=null;
+function save(){
+  var j=JSON.stringify(S);
+  try{localStorage.setItem("debt-tracker",j)}catch(e){}
+  clearTimeout(t);
+  t=setTimeout(function(){if(store)store.set({json:j}).catch(function(){})},400);
+}
+function tick(first){
+  var n=0,t0=today();
+  S.debts.forEach(function(d){
+    if(!(d.amt>0)||!d.next)return;
+    var g=0;
+    while(d.next&&d.next<=t0&&g++<600){
+      var b=bal(d);
+      if(b<=0.005){d.next="";break}
+      (d.ask?S.q:S.pays).push(d.ask?{id:uid(),d:d.id,amt:Math.min(d.amt,b),date:d.next}:{id:uid(),d:d.id,amt:Math.min(d.amt,b),date:d.next,note:"scheduled"});n++;
+      d.next=adv(d);
+    }
+    if(d.next&&bal(d)<=0.005)d.next="";
+  });
+  var a0=S.adj.length;S.debts.forEach(function(d){accr(d,t0,true)});n+=S.adj.length-a0;
+  var pp=S.pay;
+  if(pp&&pp.mode==='fixed'&&pp.amt>0&&pp.next){var g2=0;while(pp.next<=t0&&g2++<600){S.inc.push({id:uid(),date:pp.next,amt:pp.amt,sp:0,f:pp.freq,auto:1});n++;pp.next=adv({next:pp.next,freq:pp.freq,dom:pp.dom})}}
+  S.exp.forEach(function(e){var g=0;while(e.next&&e.next<=t0&&g++<600){S.xl.push({id:uid(),e:e.id,amt:e.amt,date:e.next});n++;e.next=adv(e)}});
+  if(n){save();$("note").innerHTML='<div class="note">✅ '+n+' automatic update'+(n>1?'s were':' was')+' recorded (pay, payments, bills or interest).</div>';if(!first)render()}
+}
+setInterval(function(){tick(false)},600000);
+document.addEventListener("visibilitychange",function(){if(!document.hidden)tick(false)});
+
+function sim(ex,st){ex=ex===undefined?S.extra:ex;st=st||S.strat;
+  var d=S.debts.map(function(x){return{apr:x.apr,min:mEq(x),bal:bal(x)}}).filter(function(x){return x.bal>0.005});
+  if(!d.length)return null;
+  var budget=d.reduce(function(a,x){return a+x.min},0)+(+ex||0),m=0,int=0,tl=[d.reduce(function(a,x){return a+x.bal},0)];
+  while(d.some(function(x){return x.bal>0.005})&&m<600){
+    m++;var av=budget;
+    d.forEach(function(x){if(x.bal>0.005){var i=x.bal*x.apr/1200;x.bal+=i;int+=i}});
+    d.forEach(function(x){if(x.bal>0.005){var p=Math.min(x.min,x.bal,av);x.bal-=p;av-=p}});
+    var act=d.filter(function(x){return x.bal>0.005}).sort(function(a,b){return st==="av"?b.apr-a.apr:a.bal-b.bal});
+    act.forEach(function(x){var p=Math.min(av,x.bal);x.bal-=p;av-=p});tl.push(d.reduce(function(a,x){return a+x.bal},0));
+  }
+  return{m:m,int:int,capped:m>=600,budget:budget,tl:tl};
+}
+
+function cov(i){var f=i.f||'w',n={w:1,b:2,m:4}[f],k0=P(wk(i.date)),o=[];for(var j=0;j<n;j++){var d=new Date(k0);d.setDate(d.getDate()-7*j);o.push(iso(d))}return o}
+function payW(){var p=S.pay;if(p&&p.mode==='fixed'&&p.amt>0)return p.amt*WQ[p.freq];var r=S.inc.slice().sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0}).slice(0,6);return r.length?r.reduce(function(a,i){return a+i.amt*WQ[i.f||'w']},0)/r.length:0}
+function weeks(){
+  var w={};
+  S.inc.forEach(function(i){var ks=cov(i),a=i.amt*WQ[i.f||'w'];ks.forEach(function(k){w[k]=w[k]||{k:k,sal:0,sp:0,dp:0,rx:0};w[k].sal+=a});w[ks[0]].sp+=i.sp||0});
+  S.pays.forEach(function(p){var k=wk(p.date);if(w[k]&&p.note!=="paid before tracking")w[k].dp+=p.amt});
+  S.xl.forEach(function(x){var k=wk(x.date);if(w[k])w[k].rx+=x.amt});
+  S.ox.forEach(function(x){var k=wk(x.date);if(w[k])w[k].sp+=x.amt});
+  return Object.keys(w).map(function(k){var r=w[k];r.sv=r.sal-r.sp-r.dp-r.rx;return r}).sort(function(a,b){return a.k<b.k?1:-1});
+}
+
+function render(){
+  var pp=S.pay,fx=pp.mode==='fixed';
+  $("fixedbox").style.display=fx?'flex':'none';$("manualbox").style.display=fx?'none':'block';$("pm").value=pp.mode;$("pf").value=pp.freq;
+  $("pinfo").textContent=fx?(pp.amt>0&&pp.next?'Next pay: '+fd(pp.next)+' · '+fmt(pp.amt)+' '+FL[pp.freq]+'. Each pay date is recorded automatically; a date of today or earlier is recorded right away.':'Enter your pay amount and next pay date, then save.'):'Log each paycheck below. Biweekly and monthly pay is spread across the weeks it covers in the table.';
+  var allD=S.debts.concat(S.loans),start=allD.reduce(function(a,d){return a+owed(d)},0),
+      rem=allD.reduce(function(a,d){return a+bal(d)},0),
+      pd=start-rem,pct=start?Math.round(pd/start*100):0,
+      t0=today(),e7=new Date();e7.setDate(e7.getDate()+7);
+  var due=S.debts.filter(function(d){return d.next&&d.amt>0&&d.next<=iso(e7)&&bal(d)>0.005}).sort(function(a,b){return a.next<b.next?-1:1});
+  $("sum").innerHTML=allD.length?
+    '<div class="meta">Total remaining</div><div class="big">'+fmt(rem)+'</div>'+
+    '<div class="bar"><i style="width:'+pct+'%"></i></div>'+
+    '<div class="row"><div class="stat"><b>'+pct+'%</b><span>paid off</span></div>'+
+    '<div class="stat"><b>'+fmt(pd)+'</b><span>paid so far</span></div>'+
+    '<div class="stat"><b>'+fmt(start)+'</b><span>starting total</span></div>'+(S.loans.length?'<div class="stat"><b>'+fmt(S.loans.reduce(function(a,d){return a+bal(d)},0))+'</b><span>owed to people</span></div>':'')+'</div>'+
+    (due.length?'<p class="meta" style="margin:12px 0 0"><b>Coming up:</b> '+due.map(function(d){return esc(d.name)+' '+fmt(d.amt)+' on '+fd(d.next)}).join(' · ')+'</p>':''):
+    '<div class="empty">Add your first debt below to get started.</div>';
+
+  var rxw=S.exp.reduce(function(a,e){return a+e.amt*WQ[e.freq]},0),ws=weeks(),commit=S.debts.reduce(function(a,d){return a+(bal(d)>0.005&&d.amt>0?d.amt*WQ[d.freq]:0)},0);
+  if(!ws.length){$("sav").innerHTML='<div class="empty">Weekly savings appear once a pay has been recorded.</div>'}
+  else{
+    var tot=ws.reduce(function(a,w){return a+w.sv},0),avg=tot/ws.length,mx=Math.max.apply(null,ws.map(function(w){return Math.abs(w.sv)}))||1,cur=ws.filter(function(w){return w.k===wk(t0)})[0];
+    $("sav").innerHTML='<div class="row"><div class="stat"><b class="'+(avg<0?'warn':'pos')+'">'+fmt(avg)+'</b><span>avg saved / week</span></div>'+
+      '<div class="stat"><b>'+(cur?fmt(cur.sv):'—')+'</b><span>saved this week</span></div>'+
+      '<div class="stat"><b>'+fmt(tot)+'</b><span>total saved ('+ws.length+' wk)</span></div>'+
+      '<div class="stat"><b>'+fmt(commit)+'</b><span>scheduled debt / week</span></div><div class="stat"><b>'+fmt(rxw)+'</b><span>bills / week</span></div></div>'+
+      '<div class="wrap"><table><tr><th>Week of</th><th>Salary</th><th>Debt paid</th><th>Bills</th><th>Other</th><th>Saved</th><th></th></tr>'+
+      ws.slice(0,12).map(function(w){return '<tr><td>'+fd(w.k)+'</td><td>'+fmt(w.sal)+'</td><td>'+fmt(w.dp)+'</td><td>'+fmt(w.rx)+'</td><td>'+fmt(w.sp)+'</td><td><span class="mini" style="width:'+Math.round(Math.abs(w.sv)/mx*50)+'px;'+(w.sv<0?'background:var(--warn)':'')+'"></span><b>'+fmt(w.sv)+'</b></td><td><button class="g'+(cf==="w"+w.k?" warn":"")+'" data-rw="'+w.k+'">'+(cf==="w"+w.k?"Tap again to confirm":"Remove")+'</button></td></tr>'}).join('')+'</table></div>'+
+      '<p class="meta" style="margin:8px 0 0">Saved = salary − debt payments made that week (Mon–Sun) − other spending − recurring bills. "Other" includes one-off expenses.</p>';
+  }
+
+  $("list").innerHTML=S.debts.length?S.debts.map(function(d){
+    var b=bal(d),p=owed(d)?Math.round((owed(d)-b)/owed(d)*100):0,sch=d.amt>0&&d.next?'Next: '+fd(d.next)+' · '+fmt(d.amt)+' '+FL[d.freq]:'No schedule set';
+    return '<div class="debt"><div class="dh"><b>'+esc(d.name)+'</b><span><b>'+fmt(b)+'</b> <span class="meta">of '+fmt(owed(d))+'</span></span></div>'+
+    '<div class="bar"><i style="width:'+p+'%"></i></div>'+
+    '<div class="dh"><span class="meta">'+p+'% paid · '+d.apr+'% APR · '+(d.apr>0&&accr(d,today(),false)>0.005?'~'+fmt(accr(d,today(),false))+' interest this month · ':'')+(lastp(d)?'last paid '+fd(lastp(d))+' · ':'')+(b<=0.005?'<b class="pos">Paid off 🎉</b>':sch)+'</span>'+
+    '<span><button class="g" data-ax="'+d.id+'">Adjust</button> <button class="g" data-ed="'+d.id+'">Schedule</button> <button class="g'+(cf==="d"+d.id?" warn":"")+'" data-del="'+d.id+'">'+(cf==="d"+d.id?"Tap again to confirm":"Remove")+'</button></span></div>'+
+    (ed===d.id?'<div class="row" style="margin-top:8px"><div class="f"><label>Amount</label><input id="ea" type="number" min="0" step="0.01" value="'+(d.amt||'')+'"></div>'+
+      '<div class="f"><label>How often</label><select id="ef"><option value="w"'+(d.freq==="w"?' selected':'')+'>Weekly</option><option value="b"'+(d.freq==="b"?' selected':'')+'>Every 2 weeks</option><option value="m"'+(d.freq==="m"?' selected':'')+'>Monthly</option></select></div>'+
+      '<div class="f"><label>Next payment date</label><input id="en" type="date" value="'+(d.next||'')+'"></div>'+
+      '<div class="f"><label>Confirm each payment?</label><select id="eq"><option value="0">No, record automatically</option><option value="1"'+(d.ask?' selected':'')+'>Yes, ask me first</option></select></div><div class="f" style="align-self:flex-end"><button data-es="'+d.id+'">Save</button></div></div>':'')+
+    axp(d)+(b>0.005?'<div class="pay"><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Extra payment" id="p'+d.id+'"><button data-pay="'+d.id+'">Log payment</button></div>':'')+
+    '</div>'}).join(''):'<div class="empty">No debts yet.</div>';
+
+  var xm=S.exp.reduce(function(a,e){return a+e.amt*MQ[e.freq]},0);
+  $("xlist").innerHTML=S.exp.length?S.exp.slice().sort(function(a,b){return a.next<b.next?-1:1}).map(function(e){
+    return '<div class="hr"><span><b>'+esc(e.name)+'</b> <span class="meta">'+esc(e.cat||"Other")+' · '+fmt(e.amt)+' '+FL[e.freq]+' · next '+fd(e.next)+'</span></span><span><button class="g" data-xed="'+e.id+'">Edit</button> <button class="g'+(cf==="x"+e.id?" warn":"")+'" data-xdel="'+e.id+'">'+(cf==="x"+e.id?"Tap again to confirm":"Remove")+'</button></span></div>'+(ex===e.id?'<div class="row" style="padding:8px 0 12px"><div class="f" style="flex:2"><label>Name</label><input id="exn" value="'+esc(e.name)+'"></div><div class="f"><label>Amount</label><input id="exa" type="number" min="0" step="0.01" value="'+e.amt+'"></div><div class="f"><label>How often</label><select id="exf">'+["w","b","m","y"].map(function(k){return '<option value="'+k+'"'+(e.freq===k?' selected':'')+'>'+FL[k]+'</option>'}).join('')+'</select></div><div class="f"><label>Next due</label><input id="exd" type="date" value="'+e.next+'"></div><div class="f"><label>Category</label><select id="exc">'+copts(e.cat||"Other")+'</select></div><div class="f" style="align-self:flex-end"><button data-xsave="'+e.id+'">Save</button></div></div>':'')}).join('')+'<p class="meta" style="margin:10px 0 0">About <b>'+fmt(xm)+'</b> per month · <b>'+fmt(xm*12/52)+'</b> per week</p>':'<div class="empty">No recurring expenses yet.</div>';
+  var wl=weeks().slice(0,8),nw=wl.length||1,
+    incW=payW(),
+    othW=wl.reduce(function(a,w){return a+w.sp},0)/nw,
+    ad=S.debts.filter(function(d){return bal(d)>0.005&&mEq(d)>0}),
+    debtW=ad.reduce(function(a,d){return a+mEq(d)*12/52},0),
+    lid={},c56=new Date();
+  c56.setDate(c56.getDate()-56);
+  var cs56=iso(c56);
+  S.loans.forEach(function(l){lid[l.id]=1});
+  var loanW=S.pays.filter(function(p){return lid[p.d]&&p.note!=='paid before tracking'&&p.date>=cs56}).reduce(function(a,p){return a+p.amt},0)/8,
+    retW=incW-debtW-loanW-rxw-othW,retM=retW*52/12,cashM=retM-(+S.extra||0),
+    row=function(l,v,b,s){var st=b?' style="font-weight:600"':'';return '<div class="hr"><span'+st+'>'+l+(s?' <span class="meta" style="font-weight:400">'+s+'</span>':'')+'</span><span'+st+'>'+v+'</span></div>'},
+    bk=function(f,per){
+      var inc=incW*f,dt=debtW*f,lp=loanW*f,rx=rxw*f,ot=othW*f,rt=inc-dt-lp-rx-ot,hh='';
+      hh+=row('Income (average per '+per+')',fmt(inc),1,S.pay.mode==='fixed'&&S.pay.amt>0?fmt(S.pay.amt)+' '+FL[S.pay.freq]:(incW>0?'average of recent pay':'set up your pay above'));
+      hh+=row('Debt payments',fmt(dt+lp),1);
+      ad.forEach(function(d){hh+=row('&nbsp;&nbsp;'+esc(d.name),fmt(mEq(d)*12/52*f),0,d.amt>0?fmt(d.amt)+' '+FL[d.freq]:'')});
+      if(lp>0)hh+=row('&nbsp;&nbsp;Paid to people',fmt(lp),0,'recent average');
+      hh+=row('Recurring expenses',fmt(rx),1);
+      S.exp.forEach(function(e){hh+=row('&nbsp;&nbsp;'+esc(e.name),fmt(e.amt*WQ[e.freq]*f),0,fmt(e.amt)+' '+FL[e.freq])});
+      hh+=row('Other spending',fmt(ot),1,'recent average');
+      return hh+row('Retained per '+per,'<span class="'+(rt<0?'warn':'pos')+'">'+fmt(rt)+'</span>',1,inc>0?Math.round(rt/inc*100)+'% of income':'')};
+  $("wkb").innerHTML=bk(1,'week');$("mob").innerHTML=bk(52/12,'month');
+
+  var base=sim(),ltot=S.loans.reduce(function(a,d){return a+bal(d)},0),lm=loanW*52/12,
+    dbm=function(m){return base&&m<base.tl.length?base.tl[m]:0},
+    dfd=function(m){var x=new Date();x.setMonth(x.getMonth()+m);return x.toLocaleDateString(undefined,{month:'long',year:'numeric'})},
+    mDone=Math.max(base?base.m:0,lm>0&&ltot>0?Math.ceil(ltot/lm):0),pn='';
+  if(base&&base.capped)pn='At current payments your interest-bearing debts will not clear within 50 years.';
+  else if(ltot>0&&lm<=0)pn=(base?'Interest-bearing debts clear by '+dfd(base.m)+'. ':'')+'There is no recent repayment pace for money owed to people, so a full debt-free date cannot be estimated yet.';
+  else if(base||ltot>0)pn='All debts cleared by <b>'+dfd(mDone)+'</b> ('+mDone+' months).';
+  $("prj").innerHTML=incW>0?'<div class="wrap"><table><tr><th>In</th><th>Debt left</th><th>Cash saved</th><th>Savings − debt</th></tr>'+[1,3,6,12,24].map(function(m){var dl=dbm(m)+Math.max(0,ltot-lm*m),cs=cashM*m;return '<tr><td>'+m+' month'+(m>1?'s':'')+'</td><td>'+fmt(dl)+'</td><td>'+fmt(cs)+'</td><td><b class="'+(cs-dl<0?'warn':'pos')+'">'+fmt(cs-dl)+'</b></td></tr>'}).join('')+'</table></div><p style="margin:10px 0 0">'+pn+'</p><p class="meta" style="margin:6px 0 0">Assumes income, bills and spending stay at recent averages. Interest-bearing debts follow your payoff plan (strategy and extra above); money owed to people shrinks at your recent repayment pace. Cash saved is what is left after all of that.</p>':'<div class="empty">Set up your pay to see projections.</div>';
+
+  var sA=sim(S.extra,'av'),sS=sim(S.extra,'sn'),ex2=Math.max(+S.extra||0,retM),sX=sim(ex2,'av'),tips=[],
+    act2=S.debts.filter(function(d){return bal(d)>0.005}),
+    ord=act2.slice().sort(function(a,b){return b.apr-a.apr||bal(a)-bal(b)}),sh='';
+  if(ord.length)sh+='<div class="meta" style="margin-bottom:4px">Suggested payoff order (highest interest first)</div>'+ord.map(function(d,i){return row((i+1)+'. '+esc(d.name),fmt(bal(d)),1,d.apr+'% APR · about '+fmt(bal(d)*d.apr/1200)+'/mo in interest')}).join('')+'<p class="meta" style="margin:8px 0 0">Pay every debt its scheduled amount, put anything extra on #1, and when it clears roll its payment into the next one.</p>';
+  if(sA&&sS&&ord.length>1){var df=sS.int-sA.int,dm=sS.m-sA.m;tips.push('Avalanche (highest APR first) is the cheapest route'+(df>=1?': about '+fmt(df)+' less interest than snowball':', and here costs about the same as snowball')+(dm>0?', finishing '+dm+' month'+(dm>1?'s':'')+' sooner':'')+'. Snowball (smallest balance first) trades some extra interest for quicker early wins, so choose it if motivation matters more.')}
+  act2.forEach(function(d){var i=bal(d)*d.apr/1200;if(d.apr>0&&mEq(d)>0&&i>mEq(d)+0.005)tips.push('<b>'+esc(d.name)+'</b>: your payments ('+fmt(mEq(d))+'/mo) do not cover its interest (about '+fmt(i)+'/mo), so the balance is growing. Raise this one first.')});
+  var sm=act2.slice().sort(function(a,b){return bal(a)-bal(b)})[0];
+  if(act2.length>1&&sm!==ord[0]&&mEq(sm)>0)tips.push('Quick win: <b>'+esc(sm.name)+'</b> has the smallest balance ('+fmt(bal(sm))+'). Clearing it frees '+fmt(mEq(sm))+'/mo to roll into the next debt.');
+  if(incW>0&&retW<0)tips.push('You are spending about '+fmt(-retW)+' more per week than you earn, so the current plan is not sustainable. Trim other spending or recurring bills before adding extra debt payments.');
+  else if(incW>0&&retW>0&&sA&&sX&&ex2>(+S.extra||0)&&sA.m>sX.m)tips.push('If you put your full monthly surplus ('+fmt(ex2)+') toward debt, your interest-bearing debts would clear by '+dfd(sX.m)+', '+(sA.m-sX.m)+' months sooner, saving about '+fmt(sA.int-sX.int)+' in interest. Keep a small cash buffer first, around one week of expenses.');
+  if(ltot>0)tips.push('Money owed to people has no interest, so clear it after your interest-bearing debts, unless the relationship makes sooner better.'+(retW>0?' Your retained '+fmt(retW)+'/week would clear '+fmt(ltot)+' in about '+Math.ceil(ltot/retW)+' weeks if you used it all here.':''));
+  $("stg").innerHTML=(sh||tips.length)?sh+tips.map(function(t){return '<p style="margin:10px 0">→ '+t+'</p>'}).join('')+'<p class="meta" style="margin:8px 0 0">Estimates for planning only, not financial advice.</p>':'<div class="empty">Add your debts, salary and expenses to get suggestions.</div>';
+
+  var mo={},mg=function(k){return mo[k]=mo[k]||{sal:0,dp:0,rx:0,sp:0}};
+  S.inc.forEach(function(i){var m=mg(i.date.slice(0,7));m.sal+=i.amt;m.sp+=i.sp||0});
+  S.pays.forEach(function(p){if(p.note!=="paid before tracking")mg(p.date.slice(0,7)).dp+=p.amt});
+  S.xl.forEach(function(x){mg(x.date.slice(0,7)).rx+=x.amt});
+  S.ox.forEach(function(x){mg(x.date.slice(0,7)).sp+=x.amt});
+  var mk=Object.keys(mo).sort().reverse().slice(0,6);
+  $("mon").innerHTML=mk.length?'<div class="wrap"><table><tr><th>Month</th><th>Salary</th><th>Debt paid</th><th>Bills</th><th>Other</th><th>Saved</th></tr>'+mk.map(function(k){var m=mo[k],sv=m.sal-m.dp-m.rx-m.sp;return '<tr><td>'+new Date(k+"-15T12:00:00").toLocaleDateString(undefined,{month:"short",year:"numeric"})+'</td><td>'+fmt(m.sal)+'</td><td>'+fmt(m.dp)+'</td><td>'+fmt(m.rx)+'</td><td>'+fmt(m.sp)+'</td><td><b class="'+(sv<0?'warn':'pos')+'">'+fmt(sv)+'</b></td></tr>'}).join('')+'</table></div><p class="meta" style="margin:8px 0 0">Saved = salary − debt payments − recurring bills − other spending, per calendar month.</p>':'<div class="empty">Your monthly summary appears once you log salary or expenses.</div>';
+  var cp=[],cq=[];
+  for(var ci=12;ci>=0;ci--){var cdt=new Date();cdt.setDate(cdt.getDate()-7*ci);var cD=iso(cdt),ct0=0;allD.forEach(function(d){ct0+=Math.max(0,balAt(d,cD))});cp.push({x:-7*ci,y:ct0})}
+  if(allD.length)for(var cm2=1;cm2<=12;cm2++)cq.push({x:Math.round(cm2*30.4),y:dbm(cm2)+Math.max(0,ltot-lm*cm2)});
+  var ym=Math.max.apply(null,cp.concat(cq).map(function(p){return p.y}))*1.08||1,
+    sx=function(x){return 30+(x+84)/449*590},sy=function(y){return 190-y/ym*165},
+    ln=function(a){return a.map(function(p,i){return(i?'L':'M')+sx(p.x).toFixed(1)+' '+sy(p.y).toFixed(1)}).join(' ')};
+  $("chart").innerHTML=allD.length?'<svg viewBox="0 0 640 225" style="width:100%;height:auto"><line x1="30" x2="620" y1="190" y2="190" style="stroke:var(--line)"/><line x1="'+sx(0)+'" x2="'+sx(0)+'" y1="25" y2="190" style="stroke:var(--line);stroke-dasharray:3 3"/><path d="'+ln(cp)+'" fill="none" style="stroke:var(--acc);stroke-width:3"/>'+(cq.length?'<path d="'+ln([cp[cp.length-1]].concat(cq))+'" fill="none" style="stroke:var(--acc);stroke-width:2.5;stroke-dasharray:6 5;opacity:.7"/>':'')+'<text x="30" y="18" style="fill:var(--mut);font-size:12px">'+fmt(ym/1.08)+'</text><text x="30" y="210" style="fill:var(--mut);font-size:12px">12 weeks ago</text><text x="'+sx(0)+'" y="210" text-anchor="middle" style="fill:var(--mut);font-size:12px">Today</text><text x="620" y="210" text-anchor="end" style="fill:var(--mut);font-size:12px">+12 months</text></svg><p class="meta" style="margin:4px 0 0">Solid line: your total debt so far. Dashed line: projected with your current plan (what you owe people shrinks at your recent pace).</p>':'<div class="empty">Add a debt to see your progress over time.</div>';
+
+  var gh='';
+  S.goals.forEach(function(g){
+    var wl3=Math.max(0,(P(g.date)-new Date())/6048e5),mo3=Math.max(1,Math.round(wl3*12/52)),tt,pc,st;
+    if(g.type==='save'){
+      var sv=g.have+weeks().filter(function(w){return w.k>=wk(g.created)}).reduce(function(a,w){return a+w.sv},0),need=wl3>0?Math.max(0,(g.target-sv)/wl3):0;
+      pc=Math.min(100,Math.max(0,Math.round(sv/g.target*100)));
+      tt=esc(g.name||'Savings goal')+' <span class="meta">'+fmt(sv)+' of '+fmt(g.target)+' by '+fd(g.date)+'</span>';
+      if(sv>=g.target)st='<b class="pos">Goal reached 🎉</b>';
+      else if(wl3<=0)st='<span class="warn">Target date passed</span>';
+      else if(retW>=need)st='<b class="pos">On pace</b>: needs '+fmt(need)+'/week, you retain about '+fmt(retW)+'/week.';
+      else st='<span class="warn">Behind pace</span>: needs '+fmt(need)+'/week, you retain about '+fmt(retW)+'/week.';
+    }else{
+      var ex3=0,done=!base||(!base.capped&&base.m<=mo3);
+      if(!done)for(ex3=25;ex3<=5000;ex3+=25){var s3=sim((+S.extra||0)+ex3,S.strat);if(s3&&!s3.capped&&s3.m<=mo3)break}
+      pc=pct;tt=esc(g.name||'Be debt-free')+' <span class="meta">by '+fd(g.date)+'</span>';
+      if(rem<=0.005)st='<b class="pos">Debt-free 🎉</b>';
+      else if(wl3<=0)st='<span class="warn">Target date passed</span>';
+      else if(done)st='<b class="pos">On track</b>'+(base?': your interest-bearing debts are projected to clear by '+dfd(base.m)+'.':'.');
+      else st='<span class="warn">Behind</span>: '+(ex3>5000?'extra payments alone cannot get there. Try a later date.':'about '+fmt(ex3)+' more per month would clear your interest-bearing debts in time.');
+      if(ltot>0&&wl3>0)st+=' To settle what you owe people by then: about '+fmt(ltot/mo3)+'/month (recent pace '+fmt(lm)+').';
+    }
+    gh+='<div class="debt"><div class="dh"><b>'+tt+'</b><button class="g'+(cf==="g"+g.id?" warn":"")+'" data-gdel="'+g.id+'">'+(cf==="g"+g.id?"Tap again to confirm":"Remove")+'</button></div><div class="bar"><i style="width:'+pc+'%"></i></div><div class="meta">'+st+'</div></div>'});
+  $("goals").innerHTML=gh||'<div class="empty">No goals yet.</div>';
+
+  $("qbox").innerHTML=S.q.length?'<div class="card"><h2>Confirm payments</h2>'+S.q.map(function(q){var d=S.debts.filter(function(x){return x.id===q.d})[0];return '<div class="hr" style="flex-wrap:wrap"><span>'+fd(q.date)+' · <b>'+esc(d?d.name:'')+'</b> <span class="meta">scheduled '+fmt(q.amt)+'</span></span><span><input id="q'+q.id+'" type="number" min="0" step="0.01" value="'+q.amt+'" style="width:100px"> <button data-qok="'+q.id+'">Paid</button> <button class="g" data-qskip="'+q.id+'">Skip</button></span></div>'}).join('')+'<p class="meta" style="margin:8px 0 0">Change the amount if you paid something different, or skip if you did not pay.</p></div>':'';
+  var ahs=S.adj.slice().sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0}).slice(0,40);
+  $("ahist").innerHTML=ahs.length?ahs.map(function(a){var d=S.debts.concat(S.loans).filter(function(x){return x.id===a.d})[0];return '<div class="hr"><span>'+esc(a.date)+' · '+esc(d?d.name:'')+' <span class="meta">('+a.type+')</span></span><span><b class="'+(a.amt>0?'warn':'pos')+'">'+(a.amt>0?'+':'')+fmt(a.amt)+'</b> <button class="g" data-aundo="'+a.id+'">Undo</button></span></div>'}).join(''):'<div class="empty">No interest, charges or corrections yet.</div>';
+  $("llist").innerHTML=S.loans.length?S.loans.map(function(d){
+    var b=bal(d),p=owed(d)?Math.round((owed(d)-b)/owed(d)*100):0;
+    return '<div class="debt"><div class="dh"><b>'+esc(d.name)+(d.note?' <span class="meta">('+esc(d.note)+')</span>':'')+'</b><span><b>'+fmt(b)+'</b> <span class="meta">of '+fmt(owed(d))+'</span></span></div><div class="bar"><i style="width:'+p+'%"></i></div><div class="dh"><span class="meta">'+p+'% repaid'+(lastp(d)?' · last paid '+fd(lastp(d)):'')+(b<=0.005?' · <b class="pos">Settled 🎉</b>':'')+'</span><span><button class="g" data-ax="'+d.id+'">Adjust</button> <button class="g'+(cf==="l"+d.id?" warn":"")+'" data-ldel="'+d.id+'">'+(cf==="l"+d.id?"Tap again to confirm":"Remove")+'</button></span></div>'+axp(d)+(b>0.005?'<div class="pay"><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount paid" id="p'+d.id+'"><button data-pay="'+d.id+'">Log payment</button></div>':'')+'</div>'}).join(''):'<div class="empty">Nothing owed to people.</div>';
+  var o30=new Date();o30.setDate(o30.getDate()-30);var c30=iso(o30),ct={};
+  S.xl.forEach(function(x){if(x.date>=c30&&x.date<=t0){var e=S.exp.filter(function(q){return q.id===x.e})[0],c=(e&&e.cat)||"Other";ct[c]=(ct[c]||0)+x.amt}});
+  S.ox.forEach(function(x){if(x.date>=c30&&x.date<=t0){var c=x.cat||"Other";ct[c]=(ct[c]||0)+x.amt}});
+  var ck=Object.keys(ct).sort(function(a,b){return ct[b]-ct[a]}),cm=ck.length?ct[ck[0]]:1,ctot=ck.reduce(function(a,k){return a+ct[k]},0);
+  $("cats").innerHTML=ck.length?ck.map(function(k){return '<div class="hr"><span>'+esc(k)+'</span><span><span class="mini" style="width:'+Math.round(ct[k]/cm*70)+'px"></span><b>'+fmt(ct[k])+'</b></span></div>'}).join('')+'<p class="meta" style="margin:8px 0 0">Total '+fmt(ctot)+' (recurring + one-off)</p>':'<div class="empty">No spending in the last 30 days.</div>';
+  var os=S.ox.slice().sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0}).slice(0,30);
+  $("olist").innerHTML=os.length?os.map(function(o){return '<div class="hr"><span>'+esc(o.date)+' · '+esc(o.name)+' <span class="meta">('+esc(o.cat||"Other")+')</span></span><span><b>'+fmt(o.amt)+'</b> <button class="g'+(cf==="o"+o.id?" warn":"")+'" data-odel="'+o.id+'">'+(cf==="o"+o.id?"Tap again to confirm":"Remove")+'</button></span></div>'}).join(''):'<div class="empty">No one-off expenses yet.</div>';
+  var r=sim();
+  $("plan").innerHTML=!S.debts.length?'':!r?'<div class="plan"><b>'+(S.loans.some(function(d){return bal(d)>0.005})?'Interest debts cleared! ':'Debt-free! ')+'🎉</b> '+(S.loans.some(function(d){return bal(d)>0.005})?'Only what you owe people is left.':'Every balance is at zero.')+'</div>':
+    r.capped?'<div class="plan warn">At '+fmt(r.budget)+'/month this won\'t pay off within 50 years. Try adding an extra monthly amount.</div>':
+    (function(){var dt=new Date();dt.setMonth(dt.getMonth()+r.m);
+    return '<div class="plan"><b>Debt-free by '+dt.toLocaleDateString(undefined,{month:"long",year:"numeric"})+'</b><br><span class="meta">'+r.m+' months at '+fmt(r.budget)+'/month · about '+fmt(r.int)+' in interest</span></div>'})();
+
+  var hs=S.pays.slice().sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0}).slice(0,40);
+  $("hist").innerHTML=hs.length?hs.map(function(p){
+    var d=S.debts.concat(S.loans).filter(function(x){return x.id===p.d})[0];
+    return '<div class="hr"><span>'+esc(p.date)+' · '+esc(d?d.name:"")+(p.note?' <span class="meta">('+esc(p.note)+')</span>':'')+'</span><span>'+(ep===p.id?'<input id="epa" type="number" min="0" step="0.01" value="'+p.amt+'" style="width:90px"> <button class="g" data-psave="'+p.id+'">Save</button>':'<b>'+fmt(p.amt)+'</b> <button class="g" data-ped="'+p.id+'">Edit</button>')+' <button class="g" data-undo="'+p.id+'">Undo</button></span></div>'}).join(''):'<div class="empty">No payments recorded yet.</div>';
+}
+
+$("add").onclick=function(){
+  var name=$("n").value.trim(),s=parseFloat($("s").value);
+  if(!name||!(s>0)){$("n").focus();return}
+  var c=$("c").value===""?s:Math.min(s,Math.max(0,parseFloat($("c").value)||0)),amt=parseFloat($("m").value)||0,nx=$("nx").value;
+  var d={id:uid(),name:name,start:s,apr:parseFloat($("a").value)||0,amt:amt,freq:$("fq").value,next:amt>0?nx:"",dom:nx?P(nx).getDate():0,iat:today()};
+  S.debts.push(d);
+  if(c<s)S.pays.push({id:uid(),d:d.id,amt:s-c,date:today(),note:"paid before tracking"});
+  ["n","s","c","a","m"].forEach(function(i){$(i).value=""});
+  tick(false);save();render();
+};
+$("addinc").onclick=function(){
+  var a=parseFloat($("ia").value),dt=$("id").value;
+  if(!(a>=0)||!dt){$("ia").focus();return}
+  S.inc.push({id:uid(),date:dt,amt:a,sp:parseFloat($("is").value)||0,f:$("pf").value});
+  $("ia").value="";$("is").value="";save();render();
+};
+$("gt").onchange=function(){var s=this.value==="save"?"":"none";$("gs1").style.display=s;$("gs2").style.display=s};
+$("addg").onclick=function(){
+  var dt=$("gd").value,ty=$("gt").value,a=parseFloat($("ga").value);
+  if(!dt||(ty==="save"&&!(a>0)))return;
+  S.goals.push({id:uid(),type:ty,name:$("gn").value.trim(),target:ty==="save"?a:0,have:ty==="save"?(parseFloat($("gh").value)||0):0,date:dt,created:today()});
+  ["gn","ga","gh","gd"].forEach(function(i){$(i).value=""});save();render();
+};
+$("bj").onclick=async function(){var t=JSON.stringify(S,null,2),r=await dl('debt-tracker-backup-'+today()+'.json',t);if(!r){$("bt").value=t;r='Downloads are not available here. Copy the text above and keep it somewhere safe.'}$("bmsg").textContent=r};
+$("bc").onclick=async function(){var t=csv(),r=await dl('debt-tracker-'+today()+'.csv',t);if(!r){$("bt").value=t;r='Downloads are not available here. Copy the text above into a spreadsheet.'}$("bmsg").textContent=r};
+$("bf").onchange=function(){var f=this.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){$("bt").value=rd.result;$("bmsg").textContent='Backup loaded. Tap Restore from backup to apply it.'};rd.readAsText(f)};
+$("br").onclick=function(){
+  var o;try{o=JSON.parse($("bt").value)}catch(e){}
+  if(!o||!Array.isArray(o.debts)){$("bmsg").textContent='Paste or choose a backup file first.';return}
+  if(cf!=='restore'){cf='restore';this.textContent='Tap again to replace all current data';return}
+  cf=null;this.textContent='Restore from backup';
+  S=Object.assign({debts:[],pays:[],inc:[],exp:[],xl:[],ox:[],loans:[],adj:[],q:[],goals:[],strat:'av',extra:0,pay:{mode:'manual',freq:'w',amt:0,next:'',dom:0}},o);
+  S.debts.forEach(function(d){if(d.amt===undefined){d.amt=d.min||0;d.freq='m';d.next=''}if(d.apr>0&&!d.iat)d.iat=today()});
+  $("strat").value=S.strat;$("extra").value=S.extra;$("pa").value=S.pay.amt||'';$("pn").value=S.pay.next||today();
+  save();tick(false);render();$("bmsg").textContent='Backup restored.'};
+$("pm").onchange=function(){S.pay.mode=this.value;save();render()};
+$("pf").onchange=function(){S.pay.freq=this.value;save();render()};
+$("psave").onclick=function(){
+  var a=parseFloat($("pa").value),nx=$("pn").value;
+  if(!(a>0)||!nx){$("pa").focus();return}
+  S.pay={mode:'fixed',freq:$("pf").value,amt:a,next:nx,dom:P(nx).getDate()};
+  tick(false);save();render();
+};
+$("addl").onclick=function(){
+  var nm=$("ln").value.trim(),s=parseFloat($("ls").value);
+  if(!nm||!(s>0)){$("ln").focus();return}
+  var c=$("lc").value===""?s:Math.min(s,Math.max(0,parseFloat($("lc").value)||0));
+  var l={id:uid(),name:nm,start:s,note:$("lt").value.trim()};
+  S.loans.push(l);
+  if(c<s)S.pays.push({id:uid(),d:l.id,amt:s-c,date:today(),note:"paid before tracking"});
+  ["ln","ls","lc","lt"].forEach(function(i){$(i).value=""});
+  save();render();
+};
+$("addo").onclick=function(){
+  var nm=$("ot").value.trim(),a=parseFloat($("oa").value),dt=$("od").value||today();
+  if(!nm||!(a>0)){$("ot").focus();return}
+  S.ox.push({id:uid(),name:nm,amt:a,date:dt,cat:$("oc").value});
+  $("ot").value="";$("oa").value="";save();render();
+};
+$("addx").onclick=function(){
+  var nm=$("xt").value.trim(),a=parseFloat($("xa").value);
+  if(!nm||!(a>0)){$("xt").focus();return}
+  var nx=$("xd").value||today();
+  S.exp.push({id:uid(),name:nm,amt:a,freq:$("xf").value,next:nx,dom:P(nx).getDate(),cat:$("xc").value});
+  $("xt").value="";$("xa").value="";tick(false);save();render();
+};
+document.addEventListener("click",function(e){
+  var g=function(k){return e.target.getAttribute(k)},id;
+  if(id=g("data-pay")){var v=parseFloat($("p"+id).value),d=S.debts.concat(S.loans).filter(function(x){return x.id===id})[0];
+    if(v>0){S.pays.push({id:uid(),d:id,amt:Math.min(v,bal(d)),date:today(),note:S.loans.indexOf(d)>=0?"":"extra"});save();render()}}
+  else if(id=g("data-del")){var x=S.debts.filter(function(q){return q.id===id})[0];
+    if(x){if(cf==="d"+id){cf=null;S.debts=S.debts.filter(function(q){return q!==x});S.pays=S.pays.filter(function(p){return p.d!==x.id});S.adj=S.adj.filter(function(a){return a.d!==x.id});S.q=S.q.filter(function(z){return z.d!==x.id});save();render()}else{cf="d"+id;render()}}}
+  else if(id=g("data-undo")){S.pays=S.pays.filter(function(p){return p.id!==id});save();render()}
+  else if(id=g("data-ed")){ed=ed===id?null:id;render()}
+  else if(id=g("data-xed")){ex=ex===id?null:id;render()}
+  else if(id=g("data-xsave")){var q=S.exp.filter(function(z){return z.id===id})[0],a=parseFloat($("exa").value),nm=$("exn").value.trim(),nd=$("exd").value;
+    if(q&&nm&&a>0&&nd){q.name=nm;q.amt=a;q.freq=$("exf").value;q.next=nd;q.dom=P(nd).getDate();q.cat=$("exc").value;ex=null;tick(false);save();render()}}
+  else if(id=g("data-tab")){tb=id;try{localStorage.setItem('dt-tab',tb)}catch(e){}tabs();window.scrollTo(0,0)}
+  else if(id=g("data-gdel")){if(cf==="g"+id){cf=null;S.goals=S.goals.filter(function(x){return x.id!==id});save();render()}else{cf="g"+id;render()}}
+  else if(id=g("data-ax")){ax=ax===id?null:id;render()}
+  else if(id=g("data-as")){var dd=S.debts.concat(S.loans).filter(function(x){return x.id===id})[0],v=parseFloat($("aa").value),ty=$("at").value;
+    if(dd&&$("aa").value!==""&&v>=0){var am=ty==="set"?v-bal(dd):ty==="add"?v:-v;
+      if(Math.abs(am)>0.004)S.adj.push({id:uid(),d:id,amt:Math.round(am*100)/100,date:today(),type:ty==="set"?"correction":ty==="add"?"charge":"credit"});
+      if(ty==="set"&&dd.apr>0)dd.iat=today();ax=null;save();render()}}
+  else if(id=g("data-aundo")){S.adj=S.adj.filter(function(a){return a.id!==id});save();render()}
+  else if(id=g("data-ped")){ep=ep===id?null:id;render()}
+  else if(id=g("data-psave")){var p2=S.pays.filter(function(p){return p.id===id})[0],nv=parseFloat($("epa").value);if(p2&&nv>0){p2.amt=nv;ep=null;save();render()}}
+  else if(id=g("data-qok")){var qq=S.q.filter(function(x){return x.id===id})[0],qa=parseFloat($("q"+id).value),qd=qq&&S.debts.filter(function(x){return x.id===qq.d})[0];
+    if(qq&&qd&&qa>0){S.pays.push({id:uid(),d:qq.d,amt:Math.min(qa,bal(qd)),date:qq.date,note:"confirmed"});S.q=S.q.filter(function(x){return x.id!==id});save();render()}}
+  else if(id=g("data-qskip")){S.q=S.q.filter(function(x){return x.id!==id});save();render()}
+  else if(id=g("data-ldel")){if(cf==="l"+id){cf=null;S.loans=S.loans.filter(function(l){return l.id!==id});S.pays=S.pays.filter(function(p){return p.d!==id});S.adj=S.adj.filter(function(a){return a.d!==id});save();render()}else{cf="l"+id;render()}}
+  else if(id=g("data-odel")){if(cf==="o"+id){cf=null;S.ox=S.ox.filter(function(o){return o.id!==id});save();render()}else{cf="o"+id;render()}}
+  else if(id=g("data-xdel")){if(cf==="x"+id){cf=null;S.exp=S.exp.filter(function(e){return e.id!==id});S.xl=S.xl.filter(function(x){return x.e!==id});save();render()}else{cf="x"+id;render()}}
+  else if(id=g("data-es")){var d2=S.debts.filter(function(q){return q.id===id})[0];
+    d2.amt=parseFloat($("ea").value)||0;d2.ask=$("eq").value==="1";d2.freq=$("ef").value;d2.next=d2.amt>0?$("en").value:"";d2.dom=d2.next?P(d2.next).getDate():0;
+    ed=null;tick(false);save();render()}
+  else if(id=g("data-rw")){if(cf==="w"+id){cf=null;S.inc=S.inc.filter(function(i){return cov(i).indexOf(id)<0});save();render()}else{cf="w"+id;render()}}
+});
+$("strat").onchange=function(){S.strat=this.value;save();render()};
+$("extra").oninput=function(){S.extra=Math.max(0,parseFloat(this.value)||0);save();render()};
+init();
+if("serviceWorker" in navigator&&location.protocol.indexOf("http")===0)navigator.serviceWorker.register("sw.js").catch(function(){});
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+</script>
+</body>
+</html>
